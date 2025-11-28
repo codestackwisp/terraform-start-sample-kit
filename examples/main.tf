@@ -1,5 +1,5 @@
 ###############################################################################
-# Audit API with CloudWatch Logging
+# Simple Example - Audit API with CloudWatch Logging Only
 ###############################################################################
 
 provider "aws" {
@@ -7,7 +7,7 @@ provider "aws" {
 }
 
 ###############################################################################
-# API Gateway + Lambda Module
+# API Gateway + Lambda Module (Simple Configuration)
 ###############################################################################
 
 module "audit_api" {
@@ -18,10 +18,10 @@ module "audit_api" {
   environment        = var.environment
   lambda_runtime     = var.lambda_runtime
   lambda_handler     = var.lambda_handler
-  lambda_source_path = "${path.module}/lambda_code"
+  lambda_source_path = "${path.module}/lambda"
 
   # Lambda configuration
-  lambda_description = "Audit event receiver - logs to CloudWatch"
+  lambda_description = "Simple audit event receiver - logs to CloudWatch"
   lambda_memory_size = 256
   lambda_timeout     = 30
 
@@ -35,7 +35,7 @@ module "audit_api" {
   lambda_log_retention_days = 14
 
   # API Gateway configuration
-  api_gateway_description    = "Audit API - CloudWatch logging"
+  api_gateway_description    = "Simple Audit API - CloudWatch logging only"
   api_gateway_stage_name     = var.environment
   enable_api_gateway_logging = true
   api_gateway_logging_level  = "INFO"
@@ -43,7 +43,7 @@ module "audit_api" {
   # Enable CORS for web applications
   enable_cors        = true
   cors_allow_origins = ["*"]
-  cors_allow_methods = ["POST", "OPTIONS"]
+  cors_allow_methods = ["POST", "GET", "OPTIONS"]
   cors_allow_headers = ["Content-Type", "Authorization"]
 
   # Tags
