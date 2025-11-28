@@ -8,7 +8,7 @@ data "aws_iam_policy_document" "lambda_assume_role" {
     
     principals {
       type        = "Service"
-      identifiers = ["lambda.amazonaws.com"]
+      identifiers = [${data.lambda_principals_identifiers}]
     }
     
     actions = ["sts:AssumeRole"]
@@ -34,7 +34,7 @@ resource "aws_iam_role" "lambda" {
 
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
   role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  policy_arn = data.aws_iam_policy.lambda_basic.arn
 }
 
 ###############################################################################
@@ -44,7 +44,7 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
 resource "aws_iam_role_policy_attachment" "lambda_vpc" {
   count      = var.lambda_vpc_subnet_ids != null ? 1 : 0
   role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+  policy_arn = data.aws_iam_policy.lambda_vpc.arn
 }
 
 ###############################################################################
@@ -54,7 +54,7 @@ resource "aws_iam_role_policy_attachment" "lambda_vpc" {
 resource "aws_iam_role_policy_attachment" "lambda_xray" {
   count      = var.lambda_tracing_mode != null ? 1 : 0
   role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
+  policy_arn = data.aws_iam_policy.lambda_xray.arn
 }
 
 ###############################################################################
@@ -107,7 +107,7 @@ data "aws_iam_policy_document" "api_gateway_assume_role" {
     
     principals {
       type        = "Service"
-      identifiers = ["apigateway.amazonaws.com"]
+      identifiers = [${data.api_gateway_principals_identifiers}]
     }
     
     actions = ["sts:AssumeRole"]
@@ -131,5 +131,5 @@ resource "aws_iam_role" "api_gateway_cloudwatch" {
 resource "aws_iam_role_policy_attachment" "api_gateway_cloudwatch" {
   count      = var.enable_api_gateway_logging ? 1 : 0
   role       = aws_iam_role.api_gateway_cloudwatch[0].name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+  policy_arn = data.aws_iam_policy.apigw_cloudwatch.arn
 }
