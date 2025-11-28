@@ -3,7 +3,7 @@
 ###############################################################################
 
 resource "aws_api_gateway_rest_api" "this" {
-  name        = "${local.name_prefix}-api"
+  name        = local.name_prefix
   description = var.api_gateway_description
 
   endpoint_configuration {
@@ -14,7 +14,7 @@ resource "aws_api_gateway_rest_api" "this" {
     local.common_tags,
     var.api_gateway_tags,
     {
-      Name = "${local.name_prefix}-api"
+      Name = local.name_prefix
     }
   )
 }
@@ -226,14 +226,14 @@ resource "aws_api_gateway_method_settings" "this" {
 
 resource "aws_cloudwatch_log_group" "api_gateway" {
   count             = var.enable_api_gateway_logging ? 1 : 0
-  name              = "/aws/apigateway/${local.name_prefix}-api"
+  name              = "/aws/apigateway/${local.name_prefix}"
   retention_in_days = var.api_gateway_log_retention_days
   kms_key_id        = var.api_gateway_log_kms_key_id
 
   tags = merge(
     local.common_tags,
     {
-      Name = "${local.name_prefix}-api-logs"
+      Name = "${local.name_prefix}-logs"
     }
   )
 }

@@ -1,31 +1,22 @@
 """
-Audit API Lambda Function
-Receives audit events via API Gateway and stores them in DynamoDB
+Audit Event Receiver
+Logs audit events to CloudWatch
 """
 
 import json
 import os
 import time
-import uuid
-import boto3
 from datetime import datetime
 
-# Initialize AWS clients
-dynamodb = boto3.resource('dynamodb')
-s3_client = boto3.client('s3')
 
 # Environment variables
-TABLE_NAME = os.environ.get('TABLE_NAME', 'audit-events')
-LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
 ENVIRONMENT = os.environ.get('ENVIRONMENT', 'dev')
-
-# DynamoDB table
-table = dynamodb.Table(TABLE_NAME)
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
 
 
 def handler(event, context):
     """
-    Lambda handler function for processing audit events
+    Lambda handler for receiving and logging audit events
     
     Args:
         event: API Gateway event
@@ -34,89 +25,102 @@ def handler(event, context):
     Returns:
         API Gateway response
     """
+    print(f"Environment: {ENVIRONMENT}")
     print(f"Received event: {json.dumps(event)}")
     
     try:
         # Extract request details
         http_method = event.get('httpMethod', 'UNKNOWN')
         path = event.get('path', '/')
-        body = event.get('body', '{}')
+        source_ip = event.get('requestContext', {}).get('identity', {}).get('sourceIp', 'unknown')
+        user_agent = event.get('requestContext', {}).get('identity', {}).get('userAgent', 'unknown')
+        request_id = event.get('requestContext', {}).get('requestId', 'unknown')
         
         # Parse request body
+        body = event.get('body', '{}')
         if body:
             try:
                 request_data = json.loads(body)
             except json.JSONDecodeError:
-                return create_response(400, {'error': 'Invalid JSON in request body'})
+                return create_response(400, {
+                    'error': 'Invalid JSON',
+                    'message': 'Request body must be valid JSON'
+                })
         else:
             request_data = {}
         
-        # Route based on HTTP method and path
+        # Route to handlers
         if http_method == 'POST' and path == '/audit':
-            return handle_audit_event(request_data, event)
+            return handle_audit_event(request_data, source_ip, user_agent, request_id)
         elif http_method == 'GET' and path == '/health':
             return handle_health_check()
-        elif http_method == 'GET' and path.startswith('/audit/'):
-            event_id = path.split('/')[-1]
-            return handle_get_audit_event(event_id)
+        elif http_method == 'GET' and path == '/':
+            return handle_root()
         else:
-            return create_response(404, {'error': 'Not found'})
+            return create_response(404, {
+                'error': 'Not found',
+                'message': f'Endpoint {http_method} {path} not found'
+            })
             
     except Exception as e:
-        print(f"Error processing request: {str(e)}")
-        return create_response(500, {'error': 'Internal server error', 'message': str(e)})
+        print(f"ERROR: {str(e)}")
+        return create_response(500, {
+            'error': 'Internal server error',
+            'message': str(e)
+        })
 
 
-def handle_audit_event(data, event):
+def handle_audit_event(data, source_ip, user_agent, request_id):
     """
-    Handle incoming audit event
+    Handle audit event and log to CloudWatch
     
     Args:
         data: Audit event data
-        event: Original API Gateway event
+        source_ip: Source IP address
+        user_agent: User agent string
+        request_id: API Gateway request ID
         
     Returns:
         API Gateway response
     """
-    # Generate event ID
-    event_id = str(uuid.uuid4())
-    timestamp = int(time.time())
+    # Validate required fields
+    required_fields = ['eventType', 'userId', 'action']
+    missing_fields = [field for field in required_fields if not data.get(field)]
     
-    # Extract metadata
-    source_ip = event.get('requestContext', {}).get('identity', {}).get('sourceIp', 'unknown')
-    user_agent = event.get('requestContext', {}).get('identity', {}).get('userAgent', 'unknown')
+    if missing_fields:
+        return create_response(400, {
+            'error': 'Missing required fields',
+            'missing': missing_fields,
+            'required': required_fields
+        })
     
-    # Create audit record
-    audit_record = {
-        'eventId': event_id,
+    # Create structured audit log entry
+    timestamp = datetime.utcnow().isoformat() + 'Z'
+    
+    audit_log = {
         'timestamp': timestamp,
-        'eventType': data.get('eventType', 'UNKNOWN'),
+        'eventType': data.get('eventType'),
         'userId': data.get('userId'),
         'action': data.get('action'),
-        'resource': data.get('resource'),
+        'resource': data.get('resource', 'N/A'),
         'result': data.get('result', 'SUCCESS'),
         'metadata': {
             'sourceIp': source_ip,
             'userAgent': user_agent,
+            'requestId': request_id,
             'environment': ENVIRONMENT,
             'additionalData': data.get('additionalData', {})
-        },
-        'ttl': timestamp + (90 * 24 * 60 * 60)  # 90 days retention
+        }
     }
     
-    # Store in DynamoDB
-    try:
-        table.put_item(Item=audit_record)
-        print(f"Audit event stored: {event_id}")
-    except Exception as e:
-        print(f"Error storing audit event: {str(e)}")
-        return create_response(500, {'error': 'Failed to store audit event'})
+    # Log the audit event (this goes to CloudWatch)
+    log_audit_event(audit_log)
     
     # Return success response
     return create_response(201, {
-        'eventId': event_id,
-        'message': 'Audit event recorded successfully',
-        'timestamp': timestamp
+        'message': 'Audit event logged successfully',
+        'timestamp': timestamp,
+        'requestId': request_id
     })
 
 
@@ -129,33 +133,51 @@ def handle_health_check():
     """
     return create_response(200, {
         'status': 'healthy',
-        'timestamp': int(time.time()),
+        'service': 'audit-api',
         'environment': ENVIRONMENT,
+        'timestamp': datetime.utcnow().isoformat() + 'Z',
         'version': '1.0.0'
     })
 
 
-def handle_get_audit_event(event_id):
+def handle_root():
     """
-    Retrieve audit event by ID
+    Handle root endpoint request
     
-    Args:
-        event_id: Event ID to retrieve
-        
     Returns:
         API Gateway response
     """
-    try:
-        response = table.get_item(Key={'eventId': event_id})
-        
-        if 'Item' in response:
-            return create_response(200, response['Item'])
-        else:
-            return create_response(404, {'error': 'Event not found'})
-            
-    except Exception as e:
-        print(f"Error retrieving audit event: {str(e)}")
-        return create_response(500, {'error': 'Failed to retrieve audit event'})
+    return create_response(200, {
+        'message': 'Audit API - CloudWatch Logging',
+        'version': '1.0.0',
+        'endpoints': {
+            'POST /audit': 'Submit audit event',
+            'GET /health': 'Health check',
+            'GET /': 'API information'
+        },
+        'documentation': 'https://github.com/your-org/api-gateway-lambda-module'
+    })
+
+
+def log_audit_event(audit_log):
+    """
+    Log audit event to CloudWatch with structured format
+    
+    Args:
+        audit_log: Structured audit log entry
+    """
+    # Log as JSON for easy parsing in CloudWatch Insights
+    log_entry = {
+        'level': 'INFO',
+        'type': 'AUDIT_EVENT',
+        'data': audit_log
+    }
+    
+    print(f"AUDIT_EVENT: {json.dumps(log_entry)}")
+    
+    # Also log in human-readable format
+    print(f"[AUDIT] {audit_log['eventType']} by {audit_log['userId']}: "
+          f"{audit_log['action']} on {audit_log['resource']} -> {audit_log['result']}")
 
 
 def create_response(status_code, body):
@@ -174,8 +196,9 @@ def create_response(status_code, body):
         'headers': {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key',
-            'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+            'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+            'Access-Control-Allow-Methods': 'POST,GET,OPTIONS',
+            'X-Request-ID': str(int(time.time() * 1000))
         },
-        'body': json.dumps(body)
+        'body': json.dumps(body, indent=2)
     }

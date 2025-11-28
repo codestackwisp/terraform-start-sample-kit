@@ -1,24 +1,39 @@
 output "api_gateway_url" {
-  description = "URL of the API Gateway"
-  value       = module.audit_api_lambda.api_gateway_url
+  description = "URL to invoke the Audit API"
+  value       = module.audit_api.api_gateway_url
+}
+
+output "api_endpoint" {
+  description = "Full endpoint URL for posting audit events"
+  value       = "${module.audit_api.api_gateway_url}audit"
 }
 
 output "lambda_function_name" {
   description = "Name of the Lambda function"
-  value       = module.audit_api_lambda.lambda_function_name
+  value       = module.audit_api.lambda_function_name
 }
 
-output "lambda_function_arn" {
-  description = "ARN of the Lambda function"
-  value       = module.audit_api_lambda.lambda_function_arn
+output "lambda_log_group" {
+  description = "CloudWatch Log Group for Lambda function"
+  value       = module.audit_api.lambda_log_group_name
 }
 
-output "dynamodb_table_name" {
-  description = "Name of the DynamoDB table"
-  value       = aws_dynamodb_table.audit_events.name
+output "api_gateway_log_group" {
+  description = "CloudWatch Log Group for API Gateway"
+  value       = module.audit_api.api_gateway_log_group_name
 }
 
-output "s3_bucket_name" {
-  description = "Name of the S3 bucket"
-  value       = aws_s3_bucket.audit_logs.id
+output "curl_test_command" {
+  description = "Sample curl command to test the API"
+  value       = <<-EOT
+    curl -X POST ${module.audit_api.api_gateway_url}audit \
+      -H "Content-Type: application/json" \
+      -d '{
+        "eventType": "USER_LOGIN",
+        "userId": "user123",
+        "action": "LOGIN",
+        "resource": "/dashboard",
+        "result": "SUCCESS"
+      }'
+  EOT
 }

@@ -12,7 +12,7 @@ data "archive_file" "lambda" {
 
 # Lambda Function
 resource "aws_lambda_function" "this" {
-  function_name    = "${local.name_prefix}-function"
+  function_name    = local.name_prefix
   description      = var.lambda_description
   role             = aws_iam_role.lambda.arn
   handler          = var.lambda_handler
@@ -91,14 +91,14 @@ resource "aws_lambda_alias" "this" {
 ###############################################################################
 
 resource "aws_cloudwatch_log_group" "lambda" {
-  name              = "/aws/lambda/${local.name_prefix}-function"
+  name              = "/aws/lambda/${local.name_prefix}"
   retention_in_days = var.lambda_log_retention_days
   kms_key_id        = var.lambda_log_kms_key_id
 
   tags = merge(
     local.common_tags,
     {
-      Name = "${local.name_prefix}-lambda-logs"
+      Name = "${local.name_prefix}-logs"
     }
   )
 }
