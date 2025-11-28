@@ -17,7 +17,7 @@ data "aws_iam_policy_document" "lambda_assume_role" {
 
 resource "aws_iam_role" "lambda" {
   name               = "${local.name_prefix}-lambda-role"
-  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
+  assume_role_policy = var.aws_iam_role_assume_role_policy
   description        = "IAM role for ${local.name_prefix} Lambda function"
 
   tags = merge(
@@ -44,7 +44,7 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
 resource "aws_iam_role_policy_attachment" "lambda_vpc" {
   count      = var.lambda_vpc_subnet_ids != null ? 1 : 0
   role       = aws_iam_role.lambda.name
-  policy_arn = data.aws_iam_policy.lambda_vpc.arn
+  policy_arn = var.aws_iam_policy_lambda_vpc_arn
 }
 
 ###############################################################################
@@ -54,7 +54,7 @@ resource "aws_iam_role_policy_attachment" "lambda_vpc" {
 resource "aws_iam_role_policy_attachment" "lambda_xray" {
   count      = var.lambda_tracing_mode != null ? 1 : 0
   role       = aws_iam_role.lambda.name
-  policy_arn = data.aws_iam_policy.lambda_xray.arn
+  policy_arn = var.aws_iam_policy_lambda_xray_arn
 }
 
 ###############################################################################
@@ -131,5 +131,5 @@ resource "aws_iam_role" "api_gateway_cloudwatch" {
 resource "aws_iam_role_policy_attachment" "api_gateway_cloudwatch" {
   count      = var.enable_api_gateway_logging ? 1 : 0
   role       = aws_iam_role.api_gateway_cloudwatch[0].name
-  policy_arn = data.aws_iam_policy.apigw_cloudwatch.arn
+  policy_arn = var.aws_iam_policy_apigw_cloudwatch_arn
 }
