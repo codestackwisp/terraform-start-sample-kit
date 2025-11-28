@@ -8,7 +8,7 @@ data "aws_iam_policy_document" "lambda_assume_role" {
     
     principals {
       type        = "Service"
-      identifiers = [${data.lambda_principals_identifiers}]
+      identifiers = [var.lambda_principals_identifiers]
     }
     
     actions = ["sts:AssumeRole"]
@@ -107,7 +107,7 @@ data "aws_iam_policy_document" "api_gateway_assume_role" {
     
     principals {
       type        = "Service"
-      identifiers = [${data.api_gateway_principals_identifiers}]
+      identifiers = [var.api_gateway_principals_identifiers]
     }
     
     actions = ["sts:AssumeRole"]

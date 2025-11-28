@@ -269,3 +269,16 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+
+variable "api_gateway_principals_identifiers" {
+  description = "API Gateway Principals Identifiers"
+  type        = string
+  default     = null
+}
+
+variable "lambda_principals_identifiers" {
+  description = "Lambda Principals Identifiers"
+  type        = string
+  default     = null
+}
