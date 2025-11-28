@@ -8,7 +8,7 @@ data "aws_iam_policy_document" "lambda_assume_role" {
     
     principals {
       type        = "Service"
-      identifiers = [var.lambda_principals_identifiers]
+      identifiers = ["lambda.amazonaws.com"]
     }
     
     actions = ["sts:AssumeRole"]
@@ -16,14 +16,14 @@ data "aws_iam_policy_document" "lambda_assume_role" {
 }
 
 resource "aws_iam_role" "lambda" {
-  name               = "${local.name_prefix}-lambda-role"
-  assume_role_policy = var.aws_iam_role_assume_role_policy
+  name               = "${local.name_prefix}-lambda"
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
   description        = "IAM role for ${local.name_prefix} Lambda function"
 
   tags = merge(
     local.common_tags,
     {
-      Name = "${local.name_prefix}-lambda-role"
+      Name = "${local.name_prefix}-lambda"
     }
   )
 }
