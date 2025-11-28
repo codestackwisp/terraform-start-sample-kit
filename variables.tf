@@ -283,29 +283,4 @@ variable "lambda_principals_identifiers" {
   default     = null
 }
 
-variable "aws_iam_role_assume_role_policy" {
-  description = "aws iam role assume role policy"
-  type        = string
-  default     = null
-}
-
-
-variable "aws_iam_policy_lambda_vpc_arn" {
-  description = "aws iam policy lambda vpc arn"
-  type        = string
-  default     = null
-}
-
-variable "aws_iam_policy_lambda_xray_arn" {
-  description = "aws iam policy lambda xray arn"
-  type        = string
-  default     = null
-}
-
-
-variable "aws_iam_policy_apigw_cloudwatch_arn" {
-  description = "aws iam policy apigw cloudwatch arn"
-  type        = string
-  default     = null
-}
 
