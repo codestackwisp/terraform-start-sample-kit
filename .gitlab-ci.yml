@@ -1,0 +1,153 @@
+
+stages:
+  - validate
+  - security
+  - test
+
+
+variables:
+  TF_VERSION: "1.14.0"
+  TFLINT_VERSION: "v0.50.0"
+  CHECKOV_VERSION: "3.1.0"
+
+
+.terraform-base:
+  image:
+    name: hashicorp/terraform:${TF_VERSION}
+    entrypoint: [""]
+  before_script:
+    - terraform --version
+
+.security-base:
+  image: python:3.11-slim
+  before_script:
+    - pip install --upgrade pip
+
+
+terraform:validate:
+  stage: validate
+  extends: .terraform-base
+  script:
+    - terraform init -backend=false
+    - terraform validate
+  only:
+    - branches
+    - merge_requests
+    - tags
+
+terraform:format-check:
+  stage: validate
+  extends: .terraform-base
+  script:
+    - terraform fmt -check -recursive -diff
+  allow_failure: true
+  only:
+    - branches
+    - merge_requests
+    - tags
+
+tflint:
+  stage: validate
+  image:
+    name: ghcr.io/terraform-linters/tflint:${TFLINT_VERSION}
+    entrypoint: [""]
+  script:
+    - tflint --init
+    - tflint --format compact
+  only:
+    - branches
+    - merge_requests
+    - tags
+
+
+
+checkov:scan:
+  stage: security
+  extends: .security-base
+  script:
+    - pip install checkov==${CHECKOV_VERSION}
+    - |
+      checkov --directory . \
+        --framework terraform \
+        --output cli \
+        --output json \
+        --output-file-path console,checkov-report.json \
+        --soft-fail
+  artifacts:
+    when: always
+    reports:
+      junit: checkov-report.json
+    paths:
+      - checkov-report.json
+    expire_in: 1 week
+  only:
+    - branches
+    - merge_requests
+    - tags
+
+tfsec:scan:
+  stage: security
+  image:
+    name: aquasec/tfsec:latest
+    entrypoint: [""]
+  script:
+    - tfsec . --format default --format json --out tfsec-report.json --soft-fail
+  artifacts:
+    when: always
+    paths:
+      - tfsec-report.json
+    expire_in: 1 week
+  allow_failure: true
+  only:
+    - branches
+    - merge_requests
+    - tags
+
+###############################################################################
+# Test Stage
+###############################################################################
+
+terraform:plan-example:
+  stage: test
+  extends: .terraform-base
+  script:
+    - cd examples
+    - terraform init
+    - terraform plan
+  only:
+    - merge_requests
+    - main
+    - master
+
+
+###############################################################################
+# Manual Jobs
+###############################################################################
+
+deploy:example:dev:
+  stage: test
+  extends: .terraform-base
+  script:
+    - cd examples
+    - terraform init
+    - terraform apply -auto-approve
+  when: manual
+  only:
+    - branches
+  environment:
+    name: dev
+    action: start
+
+destroy:example:dev:
+  stage: test
+  extends: .terraform-base
+  script:
+    - cd examples
+    - terraform init
+    - terraform destroy -auto-approve
+  when: manual
+  only:
+    - branches
+  environment:
+    name: dev
+    action: stop
