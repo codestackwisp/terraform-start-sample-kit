@@ -20,12 +20,10 @@ module "lambda_function" {
 
   # Lambda Source Code (from ZIP file)
   filename            = var.lambda_zip_file
-  source_code_hash    = filebase64sha256(var.lambda_zip_file)
+  source_path         = filebase64sha256(var.lambda_zip_file)
 
   # Environment Variables (passed to Lambda)
-  environment = {
-    variables = var.environment_variables
-  }
+  environment_variables = var.environment_variables
 
   tags = var.tags
 }

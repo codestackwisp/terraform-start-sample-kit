@@ -1,4 +1,4 @@
-aws_region           = "us-east-1"
+aws_region           = "eu-west-2"
 
 api_name             = "project-api"
 lambda_function_name = "project-lambda"

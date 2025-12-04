@@ -1,7 +1,7 @@
 variable "aws_region" {
   type        = string
   description = "AWS Region"
-  default     = "us-east-1"
+  default     = "eu-west-2"
 }
 
 variable "api_name" {
