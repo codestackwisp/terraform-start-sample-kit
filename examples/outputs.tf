@@ -17,8 +17,3 @@ output "test_command" {
   value       = module.api_with_lambda.test_command
   description = "Command to test the API"
 }
-
-output "logs_command" {
-  value       = module.api_with_lambda.logs_command
-  description = "Command to view logs"
-}
