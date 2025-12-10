@@ -2,6 +2,9 @@
 
 **Simple and beginner-friendly module** to create API Gateway with Lambda integration.
 
+
+https://docs.aws.amazon.com/config/latest/developerguide/api-gw-associated-with-waf.html
+
 ## Structure
 
 ```
