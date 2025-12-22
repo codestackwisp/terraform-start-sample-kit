@@ -18,14 +18,14 @@ module "lambda_function" {
   timeout       = var.lambda_timeout
   memory_size   = var.lambda_memory_size
 
-  # Lambda Source Code (from ZIP file)
-  filename            = var.lambda_zip_file
-  source_path         = filebase64sha256(var.lambda_zip_file)
+  source_path         = var.lambda_source_path
 
   # Environment Variables (passed to Lambda)
   environment_variables = var.environment_variables
 
-  tags = var.tags
+  tags = merge(local.block_tag, {
+    Name = "${var.prefix}-apigateway-lambda"
+  })
 }
 
 # ============================================================================
@@ -37,10 +37,12 @@ resource "aws_api_gateway_rest_api" "main" {
   description = "API Gateway for ${var.lambda_function_name}"
   
   endpoint_configuration {
-    types = ["REGIONAL"]
+    types = ["PRIVATE"]
   }
 
-  tags = var.tags
+  tags = merge(local.block_tag, {
+    Name = "${var.prefix}-apigateway-lambda"
+  })
 }
 
 # ============================================================================

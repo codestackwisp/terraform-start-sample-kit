@@ -52,10 +52,6 @@ resource "aws_vpc_endpoint" "api_gateway" {
 }
 
 
-
-
-
-
 resource "aws_api_gateway_rest_api_policy" "policy" {
   rest_api_id = aws_api_gateway_rest_api.main.id
 
