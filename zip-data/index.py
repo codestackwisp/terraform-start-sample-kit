@@ -5,7 +5,7 @@ import boto3
 import fnmatch
 
 AWS_REGION = os.getenv("AWS_REGION", "eu-west-2")
-VARIABLE_LOGGING_NAME = os.getenv("VARIABLE_LOGGING_NAME", "cip")
+VARIABLE_LOGGING_NAME = os.getenv("VARIABLE_LOGGING_NAME", "cpl")
 SSM_PARAMETER_ROOT = os.getenv("SSM_PARAMETER_ROOT", f"/{VARIABLE_LOGGING_NAME}/")
 FILTER_NAME = os.getenv(
     "FILTER_NAME",

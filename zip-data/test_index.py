@@ -27,10 +27,10 @@ def set_env_vars():
     """Set up environment variables before each test."""
     env_vars = {
         "AWS_REGION": "eu-west-2",
-        "VARIABLE_LOGGING_NAME": "cip",
-        "SSM_PARAMETER_ROOT": "/cip/",
-        "FILTER_NAME": "CipAutoCreatedFilter",
-        "FILTERS_TRACKING_PARAM": "Cip_Filters",
+        "VARIABLE_LOGGING_NAME": "cpl",
+        "SSM_PARAMETER_ROOT": "/cpl/",
+        "FILTER_NAME": "CplAutoCreatedFilter",
+        "FILTERS_TRACKING_PARAM": "Cpl_Filters",
         "SENDER_FUNCTION_NAME": "log-sender-function",
         "LOGGING_LEVEL": "INFO",
     }
@@ -83,21 +83,21 @@ def sample_parameters():
     """Sample SSM parameters for testing."""
     return [
         {
-            "Name": "/cip/api-logs",
+            "Name": "/cpl/api-logs",
             "Value": json.dumps({
                 "log_group_name_pattern": "*/api/*",
                 "prefix": "API"
             })
         },
         {
-            "Name": "/cip/web-logs",
+            "Name": "/cpl/web-logs",
             "Value": json.dumps({
                 "log_group_name_pattern": "*/web/*",
                 "prefix": "WEB"
             })
         },
         {
-            "Name": "/cip/db-logs",
+            "Name": "/cpl/db-logs",
             "Value": json.dumps({
                 "log_group_name_pattern": "*/database/*",
                 "prefix": ""
@@ -132,15 +132,15 @@ class TestConfiguration:
     
     def test_ssm_parameter_root_derived_from_logging_name(self):
         """Test that SSM_PARAMETER_ROOT is correctly derived from VARIABLE_LOGGING_NAME."""
-        variable_logging_name = "cip"
+        variable_logging_name = "cpl"
         expected_root = f"/{variable_logging_name}/"
-        assert expected_root == "/cip/"
+        assert expected_root == "/cpl/"
     
     def test_filter_name_derived_from_logging_name(self):
         """Test that FILTER_NAME is correctly derived from VARIABLE_LOGGING_NAME."""
-        variable_logging_name = "cip"
+        variable_logging_name = "cpl"
         expected_filter = f"{variable_logging_name.title().replace('_', '')}AutoCreatedFilter"
-        assert expected_filter == "CipAutoCreatedFilter"
+        assert expected_filter == "CplAutoCreatedFilter"
     
     def test_filter_name_with_underscore_in_name(self):
         """Test filter name derivation when VARIABLE_LOGGING_NAME contains underscores."""
@@ -150,9 +150,9 @@ class TestConfiguration:
     
     def test_filters_tracking_param_derived_from_logging_name(self):
         """Test that FILTERS_TRACKING_PARAM is correctly derived from VARIABLE_LOGGING_NAME."""
-        variable_logging_name = "cip"
+        variable_logging_name = "cpl"
         expected_param = f"{variable_logging_name.title().replace('_', '')}_Filters"
-        assert expected_param == "Cip_Filters"
+        assert expected_param == "Cpl_Filters"
     
     def test_default_aws_region(self):
         """Test that default AWS region is eu-west-2."""
@@ -198,7 +198,7 @@ class TestGetParametersGenerator:
         mock_paginator.paginate.return_value = [{"Parameters": sample_parameters}]
         
         # Simulate the generator
-        result = list(mock_paginator.paginate(Path="/cip/", Recursive=True))
+        result = list(mock_paginator.paginate(Path="/cpl/", Recursive=True))
         
         assert len(result) == 1
         assert len(result[0]["Parameters"]) == 3
@@ -211,9 +211,9 @@ class TestGetParametersGenerator:
         mock_paginator.paginate.return_value = [{"Parameters": []}]
         
         # Call paginate with the expected path
-        mock_paginator.paginate(Path="/cip/", Recursive=True)
+        mock_paginator.paginate(Path="/cpl/", Recursive=True)
         
-        mock_paginator.paginate.assert_called_with(Path="/cip/", Recursive=True)
+        mock_paginator.paginate.assert_called_with(Path="/cpl/", Recursive=True)
     
     def test_handles_empty_parameters(self, mock_boto3_clients):
         """Test handling when no parameters exist."""
@@ -222,7 +222,7 @@ class TestGetParametersGenerator:
         mock_ssm.get_paginator.return_value = mock_paginator
         mock_paginator.paginate.return_value = [{"Parameters": []}]
         
-        result = list(mock_paginator.paginate(Path="/cip/", Recursive=True))
+        result = list(mock_paginator.paginate(Path="/cpl/", Recursive=True))
         
         assert result[0]["Parameters"] == []
     
@@ -238,7 +238,7 @@ class TestGetParametersGenerator:
             {"Parameters": sample_parameters[2:]}
         ]
         
-        result = list(mock_paginator.paginate(Path="/cip/", Recursive=True))
+        result = list(mock_paginator.paginate(Path="/cpl/", Recursive=True))
         
         assert len(result) == 2
         total_params = sum(len(page["Parameters"]) for page in result)
@@ -317,7 +317,7 @@ class TestAddSubscriptionFilter:
         mock_logs = mock_boto3_clients["logs"]
         mock_sts = mock_boto3_clients["sts"]
         
-        filter_name = "CipAutoCreatedFilter"
+        filter_name = "CplAutoCreatedFilter"
         log_group_name = "/aws/lambda/api/service1"
         
         mock_logs.put_subscription_filter(
@@ -329,25 +329,25 @@ class TestAddSubscriptionFilter:
         
         mock_logs.put_subscription_filter.assert_called_once()
         call_args = mock_logs.put_subscription_filter.call_args
-        assert call_args[1]["filterName"] == "CipAutoCreatedFilter"
+        assert call_args[1]["filterName"] == "CplAutoCreatedFilter"
     
     def test_uses_configurable_tracking_param(self, mock_boto3_clients):
         """Test that the configurable tracking parameter name is used."""
         mock_ssm = mock_boto3_clients["ssm"]
         
-        filters_tracking_param = "Cip_Filters"
+        filters_tracking_param = "Cpl_Filters"
         
         mock_ssm.get_parameter(Name=filters_tracking_param)
         
-        mock_ssm.get_parameter.assert_called_with(Name="Cip_Filters")
+        mock_ssm.get_parameter.assert_called_with(Name="Cpl_Filters")
     
     def test_updates_tracking_param_after_adding_filter(self, mock_boto3_clients):
         """Test that tracking parameter is updated after adding a filter."""
         mock_ssm = mock_boto3_clients["ssm"]
         
         filter_list = ["/aws/lambda/api/service1"]
-        filters_tracking_param = "Cip_Filters"
-        variable_logging_name = "cip"
+        filters_tracking_param = "Cpl_Filters"
+        variable_logging_name = "cpl"
         
         mock_ssm.put_parameter(
             Name=filters_tracking_param,
@@ -359,8 +359,8 @@ class TestAddSubscriptionFilter:
         
         mock_ssm.put_parameter.assert_called_once()
         call_args = mock_ssm.put_parameter.call_args
-        assert call_args[1]["Name"] == "Cip_Filters"
-        assert "cip" in call_args[1]["Description"]
+        assert call_args[1]["Name"] == "Cpl_Filters"
+        assert "cpl" in call_args[1]["Description"]
 
 
 # =============================================================================
@@ -374,7 +374,7 @@ class TestGetLogGroupsWithFilters:
         """Test that the configurable filter name is used for searching."""
         mock_logs = mock_boto3_clients["logs"]
         
-        filter_name = "CipAutoCreatedFilter"
+        filter_name = "CplAutoCreatedFilter"
         log_group_name = "/aws/lambda/api/service1"
         
         mock_logs.describe_subscription_filters(
@@ -384,7 +384,7 @@ class TestGetLogGroupsWithFilters:
         
         mock_logs.describe_subscription_filters.assert_called_with(
             logGroupName=log_group_name,
-            filterNamePrefix="CipAutoCreatedFilter",
+            filterNamePrefix="CplAutoCreatedFilter",
         )
     
     def test_finds_log_groups_with_matching_filter(self, mock_boto3_clients, sample_log_groups):
@@ -393,7 +393,7 @@ class TestGetLogGroupsWithFilters:
         
         def describe_filters(logGroupName, filterNamePrefix):
             if "api" in logGroupName:
-                return {"subscriptionFilters": [{"filterName": "CipAutoCreatedFilter"}]}
+                return {"subscriptionFilters": [{"filterName": "CplAutoCreatedFilter"}]}
             return {"subscriptionFilters": []}
         
         mock_logs.describe_subscription_filters.side_effect = describe_filters
@@ -401,7 +401,7 @@ class TestGetLogGroupsWithFilters:
         # Simulate finding log groups with filters
         log_groups_with_filters = []
         for lg in sample_log_groups:
-            result = describe_filters(lg["logGroupName"], "CipAutoCreatedFilter")
+            result = describe_filters(lg["logGroupName"], "CplAutoCreatedFilter")
             if result["subscriptionFilters"]:
                 log_groups_with_filters.append(lg["logGroupName"])
         
@@ -423,7 +423,7 @@ class TestGetLogGroupsWithFilters:
         try:
             mock_logs.describe_subscription_filters(
                 logGroupName="/deleted/log/group",
-                filterNamePrefix="CipAutoCreatedFilter"
+                filterNamePrefix="CplAutoCreatedFilter"
             )
             assert False, "Should have raised exception"
         except mock_logs.exceptions.ResourceNotFoundException:
@@ -441,7 +441,7 @@ class TestReconcileSubscriptionFilters:
         """Test that configurable filter name is used when deleting filters."""
         mock_logs = mock_boto3_clients["logs"]
         
-        filter_name = "CipAutoCreatedFilter"
+        filter_name = "CplAutoCreatedFilter"
         log_group_name = "/aws/lambda/orphaned/service"
         
         mock_logs.delete_subscription_filter(
@@ -450,7 +450,7 @@ class TestReconcileSubscriptionFilters:
         )
         
         mock_logs.delete_subscription_filter.assert_called_with(
-            filterName="CipAutoCreatedFilter",
+            filterName="CplAutoCreatedFilter",
             logGroupName=log_group_name,
         )
     
@@ -458,11 +458,11 @@ class TestReconcileSubscriptionFilters:
         """Test that configurable tracking parameter is used during cleanup."""
         mock_ssm = mock_boto3_clients["ssm"]
         
-        filters_tracking_param = "Cip_Filters"
+        filters_tracking_param = "Cpl_Filters"
         
         mock_ssm.delete_parameter(Name=filters_tracking_param)
         
-        mock_ssm.delete_parameter.assert_called_with(Name="Cip_Filters")
+        mock_ssm.delete_parameter.assert_called_with(Name="Cpl_Filters")
     
     def test_keeps_filters_matching_patterns(self):
         """Test that filters matching patterns are kept."""
@@ -497,8 +497,8 @@ class TestSubscriptionFilterParam:
         mock_ssm = mock_boto3_clients["ssm"]
         
         filter_list = ["*/api/*", "*/web/*"]
-        filters_tracking_param = "Cip_Filters"
-        variable_logging_name = "cip"
+        filters_tracking_param = "Cpl_Filters"
+        variable_logging_name = "cpl"
         
         mock_ssm.put_parameter(
             Name=filters_tracking_param,
@@ -509,17 +509,17 @@ class TestSubscriptionFilterParam:
         )
         
         call_args = mock_ssm.put_parameter.call_args
-        assert call_args[1]["Name"] == "Cip_Filters"
+        assert call_args[1]["Name"] == "Cpl_Filters"
     
     def test_uses_configurable_solution_name_in_description(self, mock_boto3_clients):
         """Test that configurable solution name is used in description."""
         mock_ssm = mock_boto3_clients["ssm"]
         
         filter_list = ["*/api/*"]
-        variable_logging_name = "cip"
+        variable_logging_name = "cpl"
         
         mock_ssm.put_parameter(
-            Name="Cip_Filters",
+            Name="Cpl_Filters",
             Description=f"A List of Log Groups to which {variable_logging_name} has Subscription Filters Applied.",
             Value=",".join(filter_list),
             Type="String",
@@ -527,7 +527,7 @@ class TestSubscriptionFilterParam:
         )
         
         call_args = mock_ssm.put_parameter.call_args
-        assert "cip" in call_args[1]["Description"]
+        assert "cpl" in call_args[1]["Description"]
         assert "serpent" not in call_args[1]["Description"].lower()
 
 
@@ -561,13 +561,13 @@ class TestLambdaHandler:
             "detail": {
                 "eventName": "PutParameter",
                 "requestParameters": {
-                    "name": "/cip/new-config"
+                    "name": "/cpl/new-config"
                 }
             }
         }
         
         param_name = event["detail"]["requestParameters"]["name"]
-        ssm_parameter_root = "/cip/"
+        ssm_parameter_root = "/cpl/"
         
         assert ssm_parameter_root in param_name
     
@@ -583,7 +583,7 @@ class TestLambdaHandler:
         }
         
         param_name = event["detail"]["requestParameters"]["name"]
-        ssm_parameter_root = "/cip/"
+        ssm_parameter_root = "/cpl/"
         
         assert ssm_parameter_root not in param_name
     
@@ -593,14 +593,14 @@ class TestLambdaHandler:
             "detail": {
                 "eventName": "DeleteParameter",
                 "requestParameters": {
-                    "name": "/cip/old-config"
+                    "name": "/cpl/old-config"
                 }
             }
         }
         
         event_name = event["detail"]["eventName"]
         param_name = event["detail"]["requestParameters"]["name"]
-        ssm_parameter_root = "/cip/"
+        ssm_parameter_root = "/cpl/"
         
         assert event_name == "DeleteParameter"
         assert ssm_parameter_root in param_name
@@ -617,7 +617,7 @@ class TestLambdaHandler:
         }
         
         param_name = event["detail"]["requestParameters"]["name"]
-        ssm_parameter_root = "/cip/"
+        ssm_parameter_root = "/cpl/"
         
         assert ssm_parameter_root not in param_name
     
@@ -637,8 +637,8 @@ class TestLambdaHandler:
     
     def test_uses_configurable_name_in_log_messages(self):
         """Test that configurable solution name would be used in log messages."""
-        variable_logging_name = "cip"
-        param_name = "/cip/config"
+        variable_logging_name = "cpl"
+        param_name = "/cpl/config"
         
         # Simulate what the log message should look like
         log_message = f"Processing PutParameter event for {variable_logging_name.upper()} parameter: {param_name}"
@@ -660,21 +660,21 @@ class TestIntegration:
             "detail": {
                 "eventName": "PutParameter",
                 "requestParameters": {
-                    "name": "/cip/new-config"
+                    "name": "/cpl/new-config"
                 }
             }
         }
         
         # Verify event is for our solution
-        ssm_parameter_root = "/cip/"
+        ssm_parameter_root = "/cpl/"
         param_name = event["detail"]["requestParameters"]["name"]
         
         should_process = ssm_parameter_root in param_name
         assert should_process is True
         
         # Verify we would use configurable names
-        filter_name = "CipAutoCreatedFilter"
-        filters_tracking_param = "Cip_Filters"
+        filter_name = "CplAutoCreatedFilter"
+        filters_tracking_param = "Cpl_Filters"
         
         assert "serpent" not in filter_name.lower()
         assert "serpent" not in filters_tracking_param.lower()
@@ -685,13 +685,13 @@ class TestIntegration:
             "detail": {
                 "eventName": "DeleteParameter",
                 "requestParameters": {
-                    "name": "/cip/old-config"
+                    "name": "/cpl/old-config"
                 }
             }
         }
         
         # Verify event is for our solution
-        ssm_parameter_root = "/cip/"
+        ssm_parameter_root = "/cpl/"
         param_name = event["detail"]["requestParameters"]["name"]
         
         should_process = ssm_parameter_root in param_name
@@ -701,10 +701,10 @@ class TestIntegration:
         """Test that different solution names produce correct derived values."""
         test_cases = [
             {
-                "name": "cip",
-                "expected_root": "/cip/",
-                "expected_filter": "CipAutoCreatedFilter",
-                "expected_param": "Cip_Filters"
+                "name": "cpl",
+                "expected_root": "/cpl/",
+                "expected_filter": "CplAutoCreatedFilter",
+                "expected_param": "Cpl_Filters"
             },
             {
                 "name": "audit_log",
@@ -741,7 +741,7 @@ class TestEdgeCases:
     
     def test_handles_empty_parameter_value(self):
         """Test handling of parameters with empty values."""
-        parameters = [{"Name": "/cip/empty", "Value": ""}]
+        parameters = [{"Name": "/cpl/empty", "Value": ""}]
         
         for param in parameters:
             value = param["Value"]
@@ -749,7 +749,7 @@ class TestEdgeCases:
     
     def test_handles_malformed_json_value(self):
         """Test handling of parameters with malformed JSON values."""
-        parameters = [{"Name": "/cip/malformed", "Value": "not-valid-json"}]
+        parameters = [{"Name": "/cpl/malformed", "Value": "not-valid-json"}]
         
         for param in parameters:
             try:
@@ -769,7 +769,7 @@ class TestEdgeCases:
             }
         }
         
-        param = {"Name": "/cip/nested", "Value": json.dumps(nested_value)}
+        param = {"Name": "/cpl/nested", "Value": json.dumps(nested_value)}
         parsed = json.loads(param["Value"])
         
         assert parsed["log_group_name_pattern"] == "*/api/*"
@@ -805,7 +805,7 @@ class TestEdgeCases:
             "description": "日本語テスト"  # Japanese characters
         }
         
-        param = {"Name": "/cip/unicode", "Value": json.dumps(param_value)}
+        param = {"Name": "/cpl/unicode", "Value": json.dumps(param_value)}
         parsed = json.loads(param["Value"])
         
         assert parsed["description"] == "日本語テスト"
