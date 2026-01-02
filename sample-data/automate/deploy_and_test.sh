@@ -97,6 +97,43 @@ print_info "AWS Account: ${WORKLOAD_ACCOUNT_ID}"
 print_info "Region: ${AWS_REGION}"
 
 ################################################################################
+# CLEANUP EXISTING TEST RESOURCES (if any)
+################################################################################
+
+print_section "Checking for Existing Test Resources"
+
+# Find any existing deployment files
+EXISTING_DEPLOYMENTS=$(ls -t .cpl-deployment-*.json 2>/dev/null || true)
+
+if [ ! -z "$EXISTING_DEPLOYMENTS" ]; then
+    print_warning "Found existing test deployments"
+    
+    for dep_file in $EXISTING_DEPLOYMENTS; do
+        print_info "Found: $dep_file"
+    done
+    
+    echo ""
+    read -p "Do you want to cleanup existing resources before deploying? (yes/no): " cleanup_choice
+    
+    if [ "$cleanup_choice" = "yes" ]; then
+        print_info "Cleaning up existing resources..."
+        
+        for dep_file in $EXISTING_DEPLOYMENTS; do
+            if [ -f "cleanup.sh" ]; then
+                print_info "Running cleanup for: $dep_file"
+                ./cleanup.sh "$dep_file" <<< "yes" 2>/dev/null || print_warning "Cleanup had some errors (continuing)"
+            fi
+        done
+        
+        print_success "Cleanup complete"
+    else
+        print_info "Skipping cleanup - will create new resources with unique names"
+    fi
+else
+    print_success "No existing test resources found"
+fi
+
+################################################################################
 # CHECK LAMBDA CODE
 ################################################################################
 
@@ -110,11 +147,29 @@ LAMBDA_DIR=""
 if [ -f "management-lambda/code/index.py" ]; then
     LAMBDA_FILE="index.py"
     LAMBDA_DIR="management-lambda/code"
+elif [ -f "code/index.py" ]; then
+    LAMBDA_FILE="index.py"
+    LAMBDA_DIR="code"
+elif [ -f "index.py" ]; then
+    LAMBDA_FILE="index.py"
+    LAMBDA_DIR="."
+elif [ -f "lambda_function.py" ]; then
+    LAMBDA_FILE="lambda_function.py"
+    LAMBDA_DIR="."
+elif [ -f "app.py" ]; then
+    LAMBDA_FILE="app.py"
+    LAMBDA_DIR="."
+elif [ -f "main.py" ]; then
+    LAMBDA_FILE="main.py"
+    LAMBDA_DIR="."
 else
     print_error "Lambda function file not found!"
     echo ""
     echo "Searched in:"
     echo "  - management-lambda/code/index.py"
+    echo "  - code/index.py"
+    echo "  - index.py"
+    echo "  - lambda_function.py"
     echo ""
     echo "Current directory: $(pwd)"
     echo "Directory structure:"
@@ -235,6 +290,40 @@ print_success "Created cross-account role"
 sleep 5
 
 ################################################################################
+# SAVE DEPLOYMENT INFO EARLY (for cleanup if deployment fails)
+################################################################################
+
+print_section "Saving Deployment Info"
+save_deployment_info
+print_success "Deployment info saved: ${DEPLOYMENT_INFO_FILE}"
+print_info "If deployment fails, you can cleanup with: ./cleanup.sh ${DEPLOYMENT_INFO_FILE}"
+
+# Set error trap to show cleanup command
+trap 'echo ""; print_error "Deployment failed!"; print_warning "Cleanup with: ./cleanup.sh ${DEPLOYMENT_INFO_FILE}"; exit 1' ERR
+
+################################################################################
+# DETERMINE HANDLER NAME FIRST
+################################################################################
+
+# Determine the Lambda handler based on filename
+HANDLER_NAME=""
+LAMBDA_FILENAME=$(basename ${LAMBDA_FILE})
+
+if [ "$LAMBDA_FILENAME" = "index.py" ]; then
+    HANDLER_NAME="index.lambda_handler"
+elif [ "$LAMBDA_FILENAME" = "lambda_function.py" ]; then
+    HANDLER_NAME="lambda_function.lambda_handler"
+elif [ "$LAMBDA_FILENAME" = "app.py" ]; then
+    HANDLER_NAME="app.lambda_handler"
+elif [ "$LAMBDA_FILENAME" = "main.py" ]; then
+    HANDLER_NAME="main.lambda_handler"
+else
+    HANDLER_NAME="${LAMBDA_FILENAME%.py}.lambda_handler"
+fi
+
+print_info "Handler will be: ${HANDLER_NAME}"
+
+################################################################################
 # DEPLOY LAMBDA
 ################################################################################
 
@@ -249,30 +338,14 @@ print_info "Packaging Lambda code from: ${LAMBDA_DIR}"
 if [ "$LAMBDA_DIR" = "." ]; then
     # File is in current directory
     zip -q ${PACKAGE_NAME} ${LAMBDA_FILE}
+    print_success "Package created: ${PACKAGE_NAME}"
 else
     # File is in subdirectory - need to package it properly
-    cd ${LAMBDA_DIR}
+    pushd ${LAMBDA_DIR} > /dev/null
     zip -q ../../${PACKAGE_NAME} ${LAMBDA_FILE}
-    cd - > /dev/null
+    popd > /dev/null
+    print_success "Package created: ${PACKAGE_NAME}"
 fi
-
-print_success "Package created: ${PACKAGE_NAME}"
-
-# Determine the Lambda handler based on filename
-HANDLER_NAME=""
-if [ "$LAMBDA_FILE" = "index.py" ]; then
-    HANDLER_NAME="index.lambda_handler"
-elif [ "$LAMBDA_FILE" = "lambda_function.py" ]; then
-    HANDLER_NAME="lambda_function.lambda_handler"
-elif [ "$LAMBDA_FILE" = "app.py" ]; then
-    HANDLER_NAME="app.lambda_handler"
-elif [ "$LAMBDA_FILE" = "main.py" ]; then
-    HANDLER_NAME="main.lambda_handler"
-else
-    HANDLER_NAME="${LAMBDA_FILE%.py}.lambda_handler"
-fi
-
-print_info "Using handler: ${HANDLER_NAME}"
 
 aws lambda create-function \
   --function-name ${LAMBDA_FUNCTION_NAME} \
@@ -348,8 +421,6 @@ aws events put-targets --rule ${LOG_GROUP_RULE_NAME} \
   --region ${AWS_REGION} &> /dev/null
 
 print_success "Rules configured"
-
-save_deployment_info
 
 ################################################################################
 # TESTS
