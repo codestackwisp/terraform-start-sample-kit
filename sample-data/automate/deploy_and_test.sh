@@ -102,11 +102,34 @@ print_info "Region: ${AWS_REGION}"
 
 print_section "Checking Lambda Code"
 
-if [ ! -f "lambda_function.py" ]; then
-    print_error "lambda_function.py not found"
+# Check for lambda function file in multiple locations
+LAMBDA_FILE=""
+LAMBDA_DIR=""
+
+# Check common locations
+if [ -f "management-lambda/code/index.py" ]; then
+    LAMBDA_FILE="index.py"
+    LAMBDA_DIR="management-lambda/code"
+else
+    print_error "Lambda function file not found!"
+    echo ""
+    echo "Searched in:"
+    echo "  - management-lambda/code/index.py"
+    echo ""
+    echo "Current directory: $(pwd)"
+    echo "Directory structure:"
+    find . -name "*.py" -type f 2>/dev/null | head -10
     exit 1
 fi
-print_success "Lambda code found"
+
+print_success "Lambda code found: ${LAMBDA_DIR}/${LAMBDA_FILE}"
+
+# Store full path for later use
+if [ "$LAMBDA_DIR" = "." ]; then
+    LAMBDA_FULL_PATH="${LAMBDA_FILE}"
+else
+    LAMBDA_FULL_PATH="${LAMBDA_DIR}/${LAMBDA_FILE}"
+fi
 
 ################################################################################
 # CREATE IAM ROLES
@@ -218,14 +241,44 @@ sleep 5
 print_section "Deploying Lambda"
 
 PACKAGE_NAME="lambda-package-${UNIQUE_SUFFIX}.zip"
-zip -q ${PACKAGE_NAME} lambda_function.py
-print_success "Package created"
+
+# Package the Lambda code
+print_info "Packaging Lambda code from: ${LAMBDA_DIR}"
+
+# Create package based on directory structure
+if [ "$LAMBDA_DIR" = "." ]; then
+    # File is in current directory
+    zip -q ${PACKAGE_NAME} ${LAMBDA_FILE}
+else
+    # File is in subdirectory - need to package it properly
+    cd ${LAMBDA_DIR}
+    zip -q ../../${PACKAGE_NAME} ${LAMBDA_FILE}
+    cd - > /dev/null
+fi
+
+print_success "Package created: ${PACKAGE_NAME}"
+
+# Determine the Lambda handler based on filename
+HANDLER_NAME=""
+if [ "$LAMBDA_FILE" = "index.py" ]; then
+    HANDLER_NAME="index.lambda_handler"
+elif [ "$LAMBDA_FILE" = "lambda_function.py" ]; then
+    HANDLER_NAME="lambda_function.lambda_handler"
+elif [ "$LAMBDA_FILE" = "app.py" ]; then
+    HANDLER_NAME="app.lambda_handler"
+elif [ "$LAMBDA_FILE" = "main.py" ]; then
+    HANDLER_NAME="main.lambda_handler"
+else
+    HANDLER_NAME="${LAMBDA_FILE%.py}.lambda_handler"
+fi
+
+print_info "Using handler: ${HANDLER_NAME}"
 
 aws lambda create-function \
   --function-name ${LAMBDA_FUNCTION_NAME} \
   --runtime python3.9 \
   --role arn:aws:iam::${WORKLOAD_ACCOUNT_ID}:role/${LAMBDA_ROLE_NAME} \
-  --handler lambda_function.lambda_handler \
+  --handler ${HANDLER_NAME} \
   --zip-file fileb://${PACKAGE_NAME} \
   --timeout 300 \
   --memory-size 256 \
